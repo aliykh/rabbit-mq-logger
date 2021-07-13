@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	amq "github.com/aliykh/rabbitmq-logger/log-all/amq"
 	"github.com/streadway/amqp"
@@ -18,7 +19,7 @@ func NewLogController(logger *zap.Logger, consumer *amq.LogConsumer, conn *amqp.
 	return &logController{logger: logger, consumer: consumer, conn: conn}
 }
 
-func (l logController) ReceiveLogs() {
+func (l logController) ReceiveLogs(ctx context.Context) {
 
 	ch, err := l.conn.Channel()
 
@@ -36,7 +37,7 @@ func (l logController) ReceiveLogs() {
 		return
 	}
 	
-	err = l.consumer.Receive(ch)
+	err = l.consumer.Receive(ctx, ch)
 	if err != nil {
 		l.logger.Error(fmt.Sprintf("Error while receiving message %s", err.Error()))
 		return

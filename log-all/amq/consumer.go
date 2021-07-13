@@ -1,10 +1,11 @@
 package amq
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/streadway/amqp"
 	"go.uber.org/zap"
-	"log"
 )
 
 type Body struct {
@@ -41,7 +42,7 @@ func (l LogConsumer) InitializeExchange(ch *amqp.Channel) error {
 	return nil
 }
 
-func (l LogConsumer) Receive(ch *amqp.Channel) error {
+func (l LogConsumer) Receive(ctx context.Context, ch *amqp.Channel) error {
 
 	q, err := ch.QueueDeclare(
 		"",    // name
@@ -80,10 +81,11 @@ func (l LogConsumer) Receive(ch *amqp.Channel) error {
 		return err
 	}
 
-	forever := make(chan bool)
-	go func() {
+LOOP:
+	for {
 
-		for v := range delivery {
+		select {
+		case v := <-delivery:
 			data := &Body{}
 			err = json.Unmarshal(v.Body, data)
 			if err != nil {
@@ -100,13 +102,31 @@ func (l LogConsumer) Receive(ch *amqp.Channel) error {
 			default:
 				l.logger.Sugar().Infof("LOG UNIDENTIFIED: %s\n", data.Msg)
 			}
-
+		case <-ctx.Done():
+			fmt.Println("consumer shutting down...")
+			break LOOP
 		}
 
-	}()
+		//for v := range delivery {
+		//	data := &Body{}
+		//	err = json.Unmarshal(v.Body, data)
+		//	if err != nil {
+		//		l.logger.Sugar().Errorf("Error while parsing the body %v", err.Error())
+		//	}
+		//
+		//	switch data.Type {
+		//	case "error":
+		//		l.logger.Sugar().Errorf("ERROR: %s\n", data.Msg)
+		//	case "debug":
+		//		l.logger.Sugar().Infof("DEBUG: %s\n", data.Msg)
+		//	case "info":
+		//		l.logger.Sugar().Infof("INFO: %s\n", data.Msg)
+		//	default:
+		//		l.logger.Sugar().Infof("LOG UNIDENTIFIED: %s\n", data.Msg)
+		//	}
+		//
+		//}
 
-	log.Printf(" [*] Waiting for logs. To exit press CTRL+C")
-	<-forever
-
+	}
 	return nil
 }

@@ -83,7 +83,6 @@ func (l LogProducer) Emit(msg Message) (err error) {
 		return
 	}
 
-	msg.Body.Type = l.routingKey
 
 	b, err := json.Marshal(msg.Body)
 	if err != nil {
